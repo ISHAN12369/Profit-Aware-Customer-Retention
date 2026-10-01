@@ -72,6 +72,11 @@ Models with **identical ROC-AUC** can yield **entirely different profits**. ROC-
 ### 4. F1-Optimal ≠ Profit-Optimal
 F1-score treats false positives and false negatives symmetrically (harmonic mean of precision and recall). The business cost structure is asymmetric (3:1 ratio of lost value to wasted cost), making the F1-optimal threshold suboptimal for profit.
 
+### 5. Bootstrap Profit Estimate
+```
+95% Confidence Interval for Max Profit: $11,950.00 - $19,205.00
+```
+
 ---
 
 ## Methodology
@@ -123,17 +128,61 @@ Raw Data
 
 ## Results
 
+### Cross-Validation Performance
+
+| Model | Best CV ROC-AUC |
+|-------|----------------|
+| Logistic Regression | 0.8447 |
+| Random Forest | 0.8449 |
+| XGBoost | 0.8420 |
+| LightGBM | 0.8425 |
+
+### Feature Distributions
+
+<p align="center">
+  <img src="assets/feature_distributions.png" alt="Feature Distributions: Tenure, Monthly Charges, Total Charges vs Churn" width="100%">
+</p>
+
+> Churners tend to have **shorter tenure**, **higher monthly charges**, and cluster at **lower total charges** — consistent with early-exit, premium-plan customers.
+
 ### Calibration Curves
+
+<p align="center">
+  <img src="assets/calibration_curves.png" alt="Reliability Diagrams for All Models" width="100%">
+</p>
 
 The reliability diagrams show how calibration transforms the probability distributions:
 - **Before calibration**: Tree-based models show characteristic sigmoid distortions
 - **After calibration**: Probabilities align with the diagonal (perfect calibration)
 
-### Sensitivity Analysis
+### Final Model Comparison (Test Set)
+
+| Model | Calibration | ROC-AUC | PR-AUC | Brier Loss | Profit-Opt Threshold | Max Profit ($) | F1-Opt Threshold | Profit @ F1 ($) |
+|-------|-------------|---------|--------|------------|---------------------|---------------|-----------------|----------------|
+| Logistic Regression | Uncalibrated | 0.8325 | 0.6195 | 0.1415 | 0.29 | 16,000 | 0.29 | 16,000 |
+| Logistic Regression | Sigmoid | 0.8325 | 0.6195 | 0.1420 | 0.31 | 16,000 | 0.28 | 15,950 |
+| LightGBM | Sigmoid | 0.8333 | 0.6281 | 0.1416 | 0.30 | 15,900 | 0.30 | 15,900 |
+| LightGBM | Uncalibrated | 0.8333 | 0.6281 | 0.1410 | 0.31 | 15,850 | — | — |
+| LightGBM | Isotonic | 0.8309 | 0.6056 | 0.1424 | 0.33 | 15,800 | — | — |
+| XGBoost | Sigmoid | 0.8304 | 0.6205 | 0.1439 | 0.30 | 15,600 | — | — |
+| Random Forest | Uncalibrated | 0.8290 | 0.6331 | 0.1428 | 0.34 | 15,400 | — | — |
+| Random Forest | Sigmoid | 0.8290 | 0.6331 | 0.1437 | 0.22 | 15,400 | — | — |
+
+> **Key takeaway**: Logistic Regression (Uncalibrated) and LightGBM (Sigmoid) lead in profit. Notice how the **profit-optimal threshold** for calibrated models clusters around the **theoretical** `p* = 0.333`, while uncalibrated tree models diverge.
+
+### Sensitivity Analysis: Cost vs. Optimal Threshold
+
+<p align="center">
+  <img src="assets/sensitivity_analysis.png" alt="Sensitivity Analysis: Empirical vs Theoretical Optimal Threshold" width="80%">
+</p>
 
 The empirical optimal threshold tracks the theoretical curve `p* = C/(s·V)` closely after calibration, confirming that the model's probabilities are well-calibrated across different cost scenarios.
 
 ### SHAP Feature Importance
+
+<p align="center">
+  <img src="assets/shap_summary.png" alt="SHAP Summary Plot for LightGBM" width="80%">
+</p>
 
 Top predictive features for churn risk include:
 - **Contract type** (month-to-month contracts have highest churn risk)
@@ -190,8 +239,13 @@ Or open directly in **Google Colab**:
 
 ```
 Profit-Aware-Customer-Retention/
-├── churn_prediction.ipynb                    # Complete analysis notebook
-├── WA_Fn-UseC_-Telco-Customer-Churn.csv      # Dataset
+├── churn_prediction.ipynb                    # Complete analysis notebook (with outputs)
+├── WA_Fn-UseC_-Telco-Customer-Churn.csv      # Dataset (7,043 rows)
+├── assets/                                    # Output visualizations
+│   ├── feature_distributions.png
+│   ├── calibration_curves.png
+│   ├── sensitivity_analysis.png
+│   └── shap_summary.png
 ├── README.md                                  # This file
 ├── .gitignore                                 # Git ignore rules
 └── LICENSE                                    # MIT License
